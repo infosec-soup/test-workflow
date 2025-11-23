@@ -1,0 +1,97 @@
+name: Positive Cases - Real Vulnerabilities
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  # POSITIVE: Real hardcoded secret
+  test-hardcoded-secret:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy with real credentials
+        run: |
+          aws configure set aws_access_key_id AKIAIOSFODNN7EXAMPLE
+          aws configure set aws_secret_access_key wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+          aws s3 sync . s3://my-bucket/
+
+  # POSITIVE: Real API key in environment
+  test-api-key:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Use API key
+        env:
+          STRIPE_API_KEY: sk_live_51234567890abcdefghijklmnopqrstuvwxyz1234567890
+        run: |
+          curl -H "Authorization: Bearer $STRIPE_API_KEY" https://api.stripe.com/v1/charges
+
+  # POSITIVE: Shell injection with user input
+  test-shell-injection:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dangerous eval with user input
+        run: |
+          eval "${{ github.event.issue.title }}"
+          bash -c "${{ github.event.pull_request.body }}"
+
+  # POSITIVE: Curl pipe bash with user input
+  test-curl-pipe-bash:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download and execute
+        run: |
+          curl -sSL https://example.com/script.sh | bash
+          echo "${{ github.event.comment.body }}" | sh
+
+  # POSITIVE: Unsafe checkout with persist-credentials
+  test-unsafe-checkout:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          persist-credentials: true
+          ref: ${{ github.event.pull_request.head.ref }}
+
+  # POSITIVE: Overly permissive permissions
+  test-permissions:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+      checks: write
+    steps:
+      - name: Do something
+        run: echo "test"
+
+  # POSITIVE: Long-term AWS credentials instead of OIDC
+  test-aws-credentials:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to AWS
+        env:
+          AWS_ACCESS_KEY_ID: AKIAIOSFODNN7EXAMPLE
+          AWS_SECRET_ACCESS_KEY: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+        run: |
+          aws s3 cp file.txt s3://bucket/
+
+  # POSITIVE: PowerShell injection
+  test-powershell-injection:
+    runs-on: windows-latest
+    steps:
+      - name: Dangerous PowerShell
+        shell: pwsh
+        run: |
+          Invoke-Expression "${{ github.event.issue.body }}"
+          & "${{ github.event.pull_request.title }}"
+
+  # POSITIVE: Base64 decode and execute
+  test-base64-execution:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Decode and run
+        run: |
+          echo "ZWNobyAiaGVsbG8i" | base64 -d | bash
+          eval $(echo "Y3VybCBodHRwczovL2V4YW1wbGUuY29tL3NjcmlwdC5zaCB8IGJhc2g=" | base64 -d)
+
