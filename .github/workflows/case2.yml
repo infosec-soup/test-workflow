@@ -1,0 +1,97 @@
+name: Mixed Cases - Real and False Positives Together
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    types: [opened]
+
+jobs:
+  # MIXED: Real vulnerability + false positive in same workflow
+  test-mixed-secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Real secret (POSITIVE)
+        env:
+          PRODUCTION_API_KEY: sk_live_51234567890abcdefghijklmnopqrstuvwxyz1234567890
+        run: |
+          curl -H "Authorization: Bearer $PRODUCTION_API_KEY" https://api.example.com/data
+      
+      - name: Example placeholder (FALSE POSITIVE)
+        env:
+          EXAMPLE_KEY: your-api-key-here
+        run: |
+          echo "This is just an example"
+
+  # MIXED: Real injection + safe logging
+  test-mixed-injection:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Real injection (POSITIVE)
+        run: |
+          eval "${{ github.event.issue.title }}"
+      
+      - name: Safe logging (FALSE POSITIVE)
+        run: |
+          echo "Issue title: ${{ github.event.issue.title }}"
+
+  # MIXED: Real unsafe checkout + safe checkout
+  test-mixed-checkout:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Unsafe checkout (POSITIVE)
+        uses: actions/checkout@v3
+        with:
+          persist-credentials: true
+          ref: ${{ github.event.pull_request.head.ref }}
+      
+      - name: Safe checkout (FALSE POSITIVE)
+        uses: actions/checkout@v3
+        with:
+          ref: refs/heads/main
+          persist-credentials: false
+
+  # MIXED: Real credentials + test data
+  test-mixed-credentials:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Real AWS credentials (POSITIVE)
+        env:
+          AWS_ACCESS_KEY_ID: AKIAIOSFODNN7EXAMPLE
+          AWS_SECRET_ACCESS_KEY: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+        run: |
+          aws s3 ls
+      
+      - name: Test data (FALSE POSITIVE)
+        env:
+          TEST_AWS_KEY: test_AKIAIOSFODNN7EXAMPLE
+          TEST_AWS_SECRET: test_wJalrXUtnFEMI
+        run: |
+          echo "Running tests"
+
+  # MIXED: Real curl pipe bash + safe curl
+  test-mixed-curl:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dangerous curl (POSITIVE)
+        run: |
+          curl -sSL https://example.com/install.sh | bash
+      
+      - name: Safe curl (FALSE POSITIVE)
+        run: |
+          curl -o install.sh https://example.com/install.sh
+          # Would validate before executing
+
+  # MIXED: Real base64 execution + safe encoding
+  test-mixed-base64:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dangerous base64 (POSITIVE)
+        run: |
+          echo "ZWNobyAiaGVsbG8i" | base64 -d | bash
+      
+      - name: Safe base64 (FALSE POSITIVE)
+        run: |
+          echo "Hello" | base64
+          # Just encoding, not executing
+
